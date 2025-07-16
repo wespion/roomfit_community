@@ -1,0 +1,5 @@
+{
+  "installCommand": "curl -fsSL https://storage.googleapis.com/flutter_infra_release/releases/stable/linux/flutter_linux_3.24.0-stable.tar.xz -o flutter.tar.xz && tar xf flutter.tar.xz && export PATH=\"$PWD/flutter/bin:$PATH\" && flutter --version && flutter pub get",
+  "buildCommand": "export PATH=\"$PWD/flutter/bin:$PATH\" && flutter build web --release",
+  "outputDirectory": "build/web"
+}
