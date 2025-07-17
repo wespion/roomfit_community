@@ -1,8 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:timeago/timeago.dart' as timeago;
 import '../models/post.dart';
+import '../models/category.dart';
 import '../services/post_service.dart';
+import '../services/category_service.dart';
 import 'post_detail_screen.dart';
+import 'post_list_screen.dart';
 import 'general_write_screen.dart';
 
 class GalleryHomeFeedScreen extends StatefulWidget {
@@ -14,8 +17,10 @@ class GalleryHomeFeedScreen extends StatefulWidget {
 
 class _GalleryHomeFeedScreenState extends State<GalleryHomeFeedScreen> {
   final PostService _postService = PostService();
+  final CategoryService _categoryService = CategoryService();
   List<Post> _posts = [];
   List<Post> _workoutPosts = []; // 오운완 게시물들
+  List<Category> _categories = []; // 실제 DB 카테고리들
   bool _isLoading = true;
   String? _error;
 
@@ -27,6 +32,7 @@ class _GalleryHomeFeedScreenState extends State<GalleryHomeFeedScreen> {
   void initState() {
     super.initState();
     _loadPosts();
+    _loadCategories();
     timeago.setLocaleMessages('ko', timeago.KoMessages());
   }
 
@@ -50,6 +56,17 @@ class _GalleryHomeFeedScreenState extends State<GalleryHomeFeedScreen> {
         _error = e.toString();
         _isLoading = false;
       });
+    }
+  }
+
+  Future<void> _loadCategories() async {
+    try {
+      final categories = await _categoryService.getCategories();
+      setState(() {
+        _categories = categories;
+      });
+    } catch (e) {
+      print('카테고리 로드 에러: $e');
     }
   }
 
@@ -138,13 +155,25 @@ class _GalleryHomeFeedScreenState extends State<GalleryHomeFeedScreen> {
   }
 
   Widget _buildCategoryButtons() {
-    final categories = [
-      {'name': '전체', 'icon': Icons.apps, 'id': 'all'},
-      {'name': '운동', 'icon': Icons.fitness_center, 'id': 'workout'},
-      {'name': '식단', 'icon': Icons.lightbulb, 'id': 'diet'},
-      {'name': 'Q&A', 'icon': Icons.help_outline, 'id': 'qa'},
-      {'name': '자유', 'icon': Icons.star, 'id': 'free'},
-      {'name': '공지', 'icon': Icons.campaign, 'id': 'notice'},
+    if (_categories.isEmpty) {
+      return const SizedBox.shrink(); // 카테고리가 없으면 숨김
+    }
+
+    // '전체' 버튼을 맨 앞에 추가하고, sortOrder 순으로 정렬된 카테고리들 추가
+    final allCategories = [
+      // 가상의 '전체' 카테고리
+      Category(
+        id: 0,
+        name: '전체',
+        slug: 'all',
+        description: '모든 게시물',
+        icon: 'apps',
+        color: '#5252FF',
+        sortOrder: -1,
+        isActive: true,
+        createdAt: DateTime.now(),
+      ),
+      ..._categories, // 실제 DB에서 가져온 카테고리들 (이미 sortOrder로 정렬됨)
     ];
 
     return Container(
@@ -152,9 +181,9 @@ class _GalleryHomeFeedScreenState extends State<GalleryHomeFeedScreen> {
       margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
       child: ListView.builder(
         scrollDirection: Axis.horizontal,
-        itemCount: categories.length,
+        itemCount: allCategories.length,
         itemBuilder: (context, index) {
-          final category = categories[index];
+          final category = allCategories[index];
           final isSelected = index == 0; // 기본적으로 '전체' 선택
 
           return Container(
@@ -163,17 +192,35 @@ class _GalleryHomeFeedScreenState extends State<GalleryHomeFeedScreen> {
               color: Colors.transparent,
               child: InkWell(
                 onTap: () {
-                  // TODO: 카테고리별 필터링 로직
-                  print('카테고리 선택: ${category['name']}');
+                  if (category.slug == 'all') {
+                    // '전체'를 누르면 아무것도 하지 않음 (이미 홈 화면)
+                    print('전체 카테고리 선택');
+                  } else {
+                    // 특정 카테고리를 누르면 해당 게시판으로 이동
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => PostListScreen(category: category),
+                      ),
+                    );
+                  }
                 },
                 borderRadius: BorderRadius.circular(25),
                 child: Container(
                   padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                   decoration: BoxDecoration(
-                    color: isSelected ? roomfitPrimary : Colors.grey[100],
+                    color: isSelected
+                        ? roomfitPrimary
+                        : (category.color != null
+                            ? _parseHexColor(category.color!).withOpacity(0.1)
+                            : Colors.grey[100]),
                     borderRadius: BorderRadius.circular(25),
                     border: Border.all(
-                      color: isSelected ? roomfitPrimary : Colors.grey[300]!,
+                      color: isSelected
+                          ? roomfitPrimary
+                          : (category.color != null
+                              ? _parseHexColor(category.color!)
+                              : Colors.grey[300]!),
                       width: 1,
                     ),
                   ),
@@ -181,17 +228,25 @@ class _GalleryHomeFeedScreenState extends State<GalleryHomeFeedScreen> {
                     mainAxisSize: MainAxisSize.min,
                     children: [
                       Icon(
-                        category['icon'] as IconData,
+                        _getIconFromName(category.icon),
                         size: 16,
-                        color: isSelected ? Colors.white : Colors.grey[700],
+                        color: isSelected
+                            ? Colors.white
+                            : (category.color != null
+                                ? _parseHexColor(category.color!)
+                                : Colors.grey[700]),
                       ),
                       const SizedBox(width: 6),
                       Text(
-                        category['name'] as String,
+                        category.name,
                         style: TextStyle(
                           fontSize: 14,
                           fontWeight: FontWeight.w600,
-                          color: isSelected ? Colors.white : Colors.grey[700],
+                          color: isSelected
+                              ? Colors.white
+                              : (category.color != null
+                                  ? _parseHexColor(category.color!)
+                                  : Colors.grey[700]),
                         ),
                       ),
                     ],
@@ -203,6 +258,33 @@ class _GalleryHomeFeedScreenState extends State<GalleryHomeFeedScreen> {
         },
       ),
     );
+  }
+
+  // 헥스 컬러를 Color 객체로 변환
+  Color _parseHexColor(String hexColor) {
+    try {
+      final hex = hexColor.replaceAll('#', '');
+      return Color(int.parse('FF$hex', radix: 16));
+    } catch (e) {
+      return roomfitPrimary; // 기본 색상
+    }
+  }
+
+  // 아이콘 이름을 IconData로 변환
+  IconData _getIconFromName(String? iconName) {
+    switch (iconName) {
+      case 'apps': return Icons.apps;
+      case 'star': return Icons.star;
+      case 'lightbulb': return Icons.lightbulb;
+      case 'help_outline': return Icons.help_outline;
+      case 'fitness_center': return Icons.fitness_center;
+      case 'campaign': return Icons.campaign;
+      case 'rate_review': return Icons.rate_review; // 제품리뷰용
+      case 'question_answer': return Icons.question_answer; // 질문용
+      case 'sports': return Icons.sports; // 오운완용
+      case 'restaurant': return Icons.restaurant; // 식단용
+      default: return Icons.category;
+    }
   }
 
   Widget _buildErrorWidget() {
