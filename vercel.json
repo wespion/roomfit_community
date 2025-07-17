@@ -1,4 +1,8 @@
 {
-  "buildCommand": "npx -y @vercel/flutter-cli build web",
-  "outputDirectory": "build/web"
+  "github": {
+    "silent": true
+  },
+  "buildCommand": "curl -s https://storage.googleapis.com/flutter_infra_release/releases/stable/linux/flutter_linux_3.24.0-stable.tar.xz | tar xJ && export PATH=\"$PWD/flutter/bin:$PATH\" && flutter build web",
+  "outputDirectory": "build/web",
+  "installCommand": "echo 'Installing Flutter...'"
 }
